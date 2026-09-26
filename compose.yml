@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:${POSTGRES_VERSION}
+    container_name: jobtracker-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - jobtracker_pgdata:/var/lib/postgresql/data
+
+volumes:
+  jobtracker_pgdata:
