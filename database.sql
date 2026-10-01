@@ -1,3 +1,4 @@
+
 CREATE TYPE application_status AS ENUM (
 'Applied',
 'OA',
@@ -5,7 +6,9 @@ CREATE TYPE application_status AS ENUM (
 'Final Round',
 'Rejected',
 'Offer'
-) 
+) ;
+
+
 CREATE TABLE applications (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     company TEXT NOT NULL,
@@ -16,4 +19,12 @@ CREATE TABLE applications (
     location TEXT,
     pay TEXT,
     job_description TEXT
-)
+);
+
+
+INSERT INTO applications(company, role, status)
+VALUES
+       ('META', 'SWE', 'Applied'),
+       ('APPLE', 'SWE', 'Applied');
+
+SELECT * FROM applications;
