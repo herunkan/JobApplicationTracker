@@ -1,6 +1,6 @@
 import datetime
-from enums import ApplicationStatus
-from fastapi import FastAPI, HTTPException, Depends
+from enums import ApplicationSortBy, ApplicationStatus, SortOrder
+from fastapi import FastAPI, HTTPException, Depends, Query
 from pydantic import BaseModel, Field, field_validator, HttpUrl, ConfigDict
 from models import JobApplication
 from database import SessionLocal
@@ -70,12 +70,42 @@ def home():
     return {"message": "Job Tracker API is running"}
 
 @app.get("/applications", response_model=list[ApplicationResponse])
-def get_applications(db: Session = Depends(get_db)):
+def get_applications(
+    db: Session = Depends(get_db),
+    company:str|None = None, 
+    role:str|None = None, 
+    location:str|None = None,
+    status:ApplicationStatus|None = None,
+    sort_by:ApplicationSortBy|None = None,
+    order:SortOrder|None = None,
+    limit:int|None = Query(default=None, ge=1),
+    offset:int|None = Query(default=None, ge=0)
+    ):
+    statement = select(JobApplication)
+    if company is not None:
+        statement = statement.where(JobApplication.company.ilike(f"%{company}%"))
+        
+    if role is not None:
+        statement = statement.where(JobApplication.role.ilike(f"%{role}%"))
     
-    result = db.execute(
-        select(JobApplication)
-    )
+    if status is not None:
+        statement = statement.where(JobApplication.status == status)
+        
+    if location is not None:
+        statement = statement.where(JobApplication.location.ilike(f"%{location}%"))
     
+    if sort_by is not None:
+        if order == SortOrder.ASC:
+            statement = statement.order_by(JobApplication.apply_date.asc())
+        else:
+            statement = statement.order_by(JobApplication.apply_date.desc())
+    
+    if limit is not None:
+        statement = statement.limit(limit)
+    if offset is not None:
+        statement = statement.offset(offset)
+        
+    result = db.execute(statement)
     jobs = result.scalars().all()
     
     return jobs

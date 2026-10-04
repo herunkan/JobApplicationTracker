@@ -7,3 +7,10 @@ class ApplicationStatus(Enum):
     FINAL_ROUND = "Final Round"
     REJECTED = "Rejected"
     OFFER = "Offer"
+    
+class SortOrder(str, Enum):
+    ASC = "asc"
+    DESC = "desc"
+    
+class ApplicationSortBy(str, Enum):
+    APPLY_DATE = "apply_date"
