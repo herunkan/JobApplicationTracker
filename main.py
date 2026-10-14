@@ -4,7 +4,7 @@ from fastapi import FastAPI, HTTPException, Depends, Query
 from pydantic import BaseModel, Field, field_validator, HttpUrl, ConfigDict
 from models import JobApplication
 from database import SessionLocal
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 class ApplicationCreate(BaseModel):
@@ -109,7 +109,56 @@ def get_applications(
     jobs = result.scalars().all()
     
     return jobs
+
+@app.get("/applications/stats")
+def get_application_aggregation(db: Session = Depends(get_db), days: int = Query(default=7, ge=1)):
+    count_by_status = db.execute(
+        select(JobApplication.status,
+               func.count(JobApplication.id)).group_by(
+            JobApplication.status
+        )
+    )
     
+    count_all_applications = db.execute(
+        select(func.count(JobApplication.id))
+    )
+    
+    count_by_company = db.execute(
+        select(
+            JobApplication.company,
+            func.count(JobApplication.id)
+        ).group_by(
+            JobApplication.company
+        )
+    )
+    
+    today = datetime.date.today()
+    seven_days_ago = today - datetime.timedelta(days-1)
+    count_recent_applications = db.execute(
+        select(func.count(JobApplication.id)).where(
+            JobApplication.apply_date.between(seven_days_ago, today)
+        )
+    )
+      
+    job_count_all = count_all_applications.scalar_one()
+    job_by_status = count_by_status.all()
+    job_by_company = count_by_company.all()
+    job_count_recent = count_recent_applications.scalar_one()
+    
+    by_status = {}
+    by_company = {}
+    
+    for status, count in job_by_status:
+        by_status[status.value] = count
+    for company, count in job_by_company:
+        by_company[company] = count     
+    
+    return {
+            "application_count" : job_count_all,
+            "by_status" : by_status,
+            "by_company": by_company,
+            "recent_applications": job_count_recent
+            }    
         
 @app.get("/applications/{application_id}", response_model=ApplicationResponse)
 def get_specific_application(application_id:int, db: Session = Depends(get_db)):
@@ -130,7 +179,7 @@ def get_specific_application(application_id:int, db: Session = Depends(get_db)):
         
     return job
 
-    
+
         
 @app.post("/applications", response_model=ApplicationResponse)
 def post_applications(application:ApplicationCreate, db: Session = Depends(get_db)):

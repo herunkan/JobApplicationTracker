@@ -27,4 +27,10 @@ VALUES
        ('META', 'SWE', 'Applied'),
        ('APPLE', 'SWE', 'Applied');
 
-SELECT * FROM applications;
+WITH cte AS (SELECT company,
+                    role,
+                    apply_date,
+                    COUNT(*) over (PARTITION BY company ORDER BY apply_date) AS running_application_count
+             FROM applications)
+
+SELECT * FROM cte
