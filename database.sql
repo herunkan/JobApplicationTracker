@@ -34,3 +34,10 @@ WITH cte AS (SELECT company,
              FROM applications)
 
 SELECT * FROM cte
+
+SELECT
+    company,
+    apply_date,
+    lag(apply_date) OVER(partition by company ORDER BY apply_date) AS previous_apply_date,
+    apply_date - lag(apply_date) OVER(partition by company ORDER BY apply_date) AS days_since_previous
+FROM applications
