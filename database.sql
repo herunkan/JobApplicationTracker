@@ -35,9 +35,25 @@ WITH cte AS (SELECT company,
 
 SELECT * FROM cte
 
+
+
 SELECT
     company,
     apply_date,
     lag(apply_date) OVER(partition by company ORDER BY apply_date) AS previous_apply_date,
     apply_date - lag(apply_date) OVER(partition by company ORDER BY apply_date) AS days_since_previous
 FROM applications
+
+
+EXPLAIN ANALYZE
+SELECT *
+FROM applications
+ORDER BY apply_date DESC;
+
+CREATE TABLE application_status_history(
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    status application_status NOT NULL,
+    changed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    application_id BIGINT NOT NULL,
+    CONSTRAINT fk_application FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE CASCADE
+);

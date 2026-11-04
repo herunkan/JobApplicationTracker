@@ -49,3 +49,10 @@ class ApplicationResponse(BaseModel):
     location:str|None = None
     pay:str|None = None
     job_description:str|None = None
+
+class HistoryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    id:int
+    status:ApplicationStatus
+    changed_at:datetime.datetime

@@ -1,8 +1,8 @@
 import datetime
 from enums import ApplicationSortBy, ApplicationStatus, SortOrder
-from schemas import ApplicationCreate, ApplicationUpdate, ApplicationResponse
+from schemas import ApplicationCreate, ApplicationUpdate, ApplicationResponse, HistoryResponse
 from fastapi import FastAPI, HTTPException, Depends, Query
-from models import JobApplication
+from models import JobApplication, JobApplicationStatusHistory
 from database import get_db
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
@@ -124,7 +124,25 @@ def get_specific_application(application_id:int, db: Session = Depends(get_db)):
         
     return job
 
-
+@app.get("/applications/{application_id}/history", response_model=list[HistoryResponse])
+def get_specific_application_history(application_id:int, db:Session = Depends(get_db)):
+    result = db.execute(
+        select(JobApplicationStatusHistory).where(
+            JobApplicationStatusHistory.application_id == application_id
+        ).order_by(
+            JobApplicationStatusHistory.changed_at.asc()
+        )
+    )
+    
+    history = result.scalars().all()
+    
+    if not history:
+        raise HTTPException(
+            status_code=404,
+            detail = "No application associated with this id"
+        )
+        
+    return history
         
 @app.post("/applications", response_model=ApplicationResponse)
 def post_applications(application:ApplicationCreate, db: Session = Depends(get_db)):
@@ -144,6 +162,14 @@ def post_applications(application:ApplicationCreate, db: Session = Depends(get_d
     new_job = JobApplication(**job_data)
     
     db.add(new_job)
+    db.flush()
+    
+    history_data = {
+        "status": application.status,
+        "application_id": new_job.id
+    }
+    history = JobApplicationStatusHistory(**history_data)
+    db.add(history)    
     db.commit()
     db.refresh(new_job)
     
@@ -196,13 +222,21 @@ def put_application(application_id:int, application:ApplicationCreate, db: Sessi
         "job_description": application.job_description
     }
     
+    if application.status != job_application.status:
+        history = JobApplicationStatusHistory(
+                application_id = job_application.id,
+                status = application.status 
+            )
+        db.add(history)
+        
+    
     for key, value in update_data.items():
         setattr(job_application, key, value)
     
     job_application.apply_date = (
         application.apply_date 
         if application.apply_date 
-        else datetime.date.today()
+        else job_application.apply_date
     )
     
     job_application.job_url = (
@@ -212,7 +246,7 @@ def put_application(application_id:int, application:ApplicationCreate, db: Sessi
     )
     
     db.commit()
-    db.refresh()
+    db.refresh(job_application)
     return job_application
 
 @app.patch("/applications/{application_id}", response_model=ApplicationResponse)
@@ -243,9 +277,16 @@ def patch_application(application_id: int, application:ApplicationUpdate, db: Se
         
         if field == "job_url" and value is not None:
             value = str(value)
+            
+        if field == "status" and value != job_application.status:
+            history = JobApplicationStatusHistory(
+                application_id = job_application.id,
+                status = value 
+            )
+            db.add(history)
                 
         setattr(job_application, field, value)
     
     db.commit()
-    db.refresh()
+    db.refresh(job_application)
     return job_application
