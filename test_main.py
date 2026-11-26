@@ -53,7 +53,8 @@ def clean_test_database():
 
     db.close()
 
-def test_create_application():
+@pytest.fixture
+def test_application():
     response = client.post(
         "/applications",
         json={
@@ -62,16 +63,22 @@ def test_create_application():
             "status": "Applied"
         }
     )
-    
-    
+
     assert response.status_code == 200
-    
     data = response.json()
-    assert data["company"] == "Test Company"
-    assert data["role"] == "Data Engineer"
-    assert data["status"] == "Applied"
+    return data
+
+
+
     
-    application_id = data["id"]
+    
+def test_create_application(test_application):
+    
+    assert test_application["company"] == "Test Company"
+    assert test_application["role"] == "Data Engineer"
+    assert test_application["status"] == "Applied"
+    
+    application_id = test_application["id"]
     
     history_response = client.get(
     f"/applications/{application_id}/history"
@@ -84,24 +91,8 @@ def test_create_application():
     assert len(history) == 1
     assert history[0]["status"] == "Applied"
     
-def test_patch_non_status_application():
-    post_response = client.post(
-        "/applications",
-        json={
-            "company": "Test Company",
-            "role": "Data Engineer",
-            "status": "Applied"
-        }
-    )
-    
-    assert post_response.status_code == 200
-    
-    data = post_response.json()
-    assert data["company"] == "Test Company"
-    assert data["role"] == "Data Engineer"
-    assert data["status"] == "Applied"
-    
-    application_id = data["id"]
+def test_patch_non_status_application(test_application):
+    application_id = test_application["id"]
     
     patch_response = client.patch(
         f"/applications/{application_id}",
@@ -128,24 +119,8 @@ def test_patch_non_status_application():
     
     
     
-def test_patch_application():
-    post_response = client.post(
-        "/applications",
-        json={
-            "company": "Test Company",
-            "role": "Data Engineer",
-            "status": "Applied"
-        }
-    )
-    
-    assert post_response.status_code == 200
-    
-    data = post_response.json()
-    assert data["company"] == "Test Company"
-    assert data["role"] == "Data Engineer"
-    assert data["status"] == "Applied"
-    
-    application_id = data["id"]
+def test_patch_application(test_application):
+    application_id = test_application["id"]
     
     patch_response = client.patch(
         f"/applications/{application_id}",
@@ -170,4 +145,70 @@ def test_patch_application():
     assert len(history_data) == 2
     assert [d["status"] for d in history_data] == ["Applied", "Interview"]    
     
+def test_patch_nonexistent_application():
+    response = client.patch(
+        "/applications/99999999999",
+        json={
+            "status": "Interview"
+        }
+    )
     
+    assert response.status_code == 404
+    
+def test_patch_required_field_to_null(test_application):
+    application_id = test_application["id"]
+    response = client.patch(
+        f"/applications/{application_id}",
+        json={
+            "status":None
+        }
+    )
+    
+    assert response.status_code == 422
+    
+def test_post_invalid_status():
+    response = client.post(
+        "/applications",
+        json={
+            "company": "Test Company",
+            "role": "Data Engineer",
+            "status": "Saved"
+        }
+    )
+    
+    assert response.status_code == 422
+    
+@pytest.mark.parametrize(
+    "invalid_status",
+    ["Saved", "Pending", "Unknown"]
+)
+def test_post_invalid_status(invalid_status):
+    response = client.post(
+        "/applications",
+        json={
+            "company": "Test Company",
+            "role": "Data Engineer",
+            "status": invalid_status
+        }
+    )
+
+    assert response.status_code == 422
+    
+def test_delete_application_cascades_history(test_application):
+    delete_response = client.delete(
+        f"/applications/{test_application["id"]}"
+    )
+    
+    assert delete_response.status_code == 200
+    
+    get_response = client.get(
+        f"/applications/{test_application["id"]}"
+    )
+    
+    assert get_response.status_code == 404
+    
+    get_history_response = client.get(
+        f"/applications/{test_application["id"]}/history"
+    )
+    
+    assert get_history_response == 404
